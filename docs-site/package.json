@@ -1,6 +1,8 @@
 {
   "devDependencies": {
-    "@antora/cli": "3.0.0",
-    "@antora/site-generator": "3.0.0"
+    "@antora/cli": "3.1.12",
+    "@antora/collector-extension": "1.0",
+    "@antora/site-generator": "3.1.12",
+    "antora-shiki-extension": "^1.0.0"
   }
 }

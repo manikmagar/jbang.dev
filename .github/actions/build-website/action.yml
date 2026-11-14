@@ -1,0 +1,107 @@
+name: 'Build Website'
+description: 'Sets up Java, JBang, and builds the website with configurable options.'
+inputs:
+  java-version:
+    description: 'Java version to use'
+    required: false
+    default: '21'
+  maven-build-args:
+    description: 'Arguments to pass to Maven build'
+    required: false
+    default: '-DskipTests=false'
+  site-future:
+    description: 'Enable site-future option for build'
+    required: false
+    default: 'false'
+  github-pages:
+    description: 'Enable github-pages option for build'
+    required: false
+    default: 'true'
+  github-token:
+    description: 'GitHub token for build (if needed)'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Java
+      uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
+      with:
+        cache: 'maven'
+        distribution: 'temurin'
+        java-version: ${{ inputs.java-version }}
+
+    - name: Setup mise
+      uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4
+
+    - name: Setup JBang
+      shell: bash
+      run: |
+        mise use -g jbang
+        jbang version --verbose
+
+    # Inlined from quarkiverse/quarkus-roq@v1 to satisfy SHA pinning policy
+    - name: Get GitHub Pages URL
+      if: ${{ inputs.github-pages == 'true' }}
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: |
+        url=$(gh api "repos/$GITHUB_REPOSITORY/pages" --jq '.html_url' 2>/dev/null || echo '')
+        if [[ $url == http* ]]; then
+          echo "GitHub Pages is enabled for this repository: $url"
+          echo "SITE_FULL_URL=$url" >> $GITHUB_ENV
+        else
+          echo "::error::GitHub Pages is not enabled for this repository."
+          exit 1
+        fi
+
+    - name: Setting envs
+      shell: bash
+      run: |
+        FULL_URL=${{ env.SITE_FULL_URL || '/' }}
+        if [[ "$FULL_URL" =~ ^https?:// ]]; then
+          SITE_URL=$(echo "$FULL_URL" | sed -E 's|(https?://[^/]+).*|\1|')
+          SITE_PATH=$(echo "$FULL_URL" | sed -E 's|https?://[^/]+||')
+          [[ -z "$SITE_PATH" ]] && SITE_PATH="/"
+        else
+          SITE_URL=""
+          SITE_PATH="${FULL_URL:-/}"
+        fi
+        echo "SITE_DIR=./" >> $GITHUB_ENV
+        if [ -n "$SITE_URL" ]; then
+          echo "SITE_URL=$SITE_URL" >> $GITHUB_ENV
+        fi
+        echo "SITE_PATH=$SITE_PATH" >> $GITHUB_ENV
+        echo "Using SITE_DIR=./, SITE_URL=$SITE_URL, SITE_PATH=$SITE_PATH"
+
+    - name: Build & Generate Site
+      shell: bash
+      run: |
+        MAVEN_CMD="./mvnw -B package quarkus:run \
+          ${{ inputs.maven-build-args }} \
+          -Dquarkus.http.root-path=${{ env.SITE_PATH }}"
+
+        if [ -n "${{ env.SITE_URL }}" ]; then
+          MAVEN_CMD="$MAVEN_CMD -Dsite.url=${{ env.SITE_URL }}"
+        fi
+
+        if [ "${{ inputs.site-future }}" = "true" ]; then
+          MAVEN_CMD="$MAVEN_CMD -Dsite.future=true"
+        fi
+
+        $MAVEN_CMD
+      env:
+        QUARKUS_ROQ_GENERATOR_BATCH: true
+
+    - name: Setup Pages
+      if: ${{ inputs.github-pages == 'true' }}
+      uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
+
+    - name: Upload Pages Artifact
+      if: ${{ inputs.github-pages == 'true' }}
+      uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
+      with:
+        path: target/roq
+        # Needed so /.well-known/ (dot-directory) is kept; the action excludes
+        # dotfiles by default via --exclude=.[^/]*
+        include-hidden-files: true

@@ -7,15 +7,16 @@ on:
   workflow_dispatch:
 jobs:
   appstore-update:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: jbang
-        uses: jbangdev/jbang-action@v0.70.0
-        with:
-          script: .github/appstore.java
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4
+      - run: jbang statsquery2.java --token ${{ secrets.CLOUDFLARE_TOKEN }} --account ${{ secrets.CLOUDFLARE_ACCOUNT }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.APPSTORE_GH_TOKEN != '' && secrets.APPSTORE_GH_TOKEN || secrets.GITHUB_TOKEN }}
+      - run: jbang .github/appstore.java
+        env:
+          GITHUB_TOKEN: ${{ secrets.APPSTORE_GH_TOKEN != '' && secrets.APPSTORE_GH_TOKEN || secrets.GITHUB_TOKEN }}
       - name: Commit updates
         run: |
           git config --global user.name 'Max Rydahl Andersen'
@@ -24,7 +25,7 @@ jobs:
           git push
       - name: Update website
         if: ${{ github.ref == 'refs/heads/main' }}
-        uses: benc-uk/workflow-dispatch@v1
+        uses: benc-uk/workflow-dispatch@31e2b3319479a63f0ab15bf800eff9e913504e26 # v1
         with:
           workflow: github-pages
           token: ${{ secrets.JEKYLL_PAT }}

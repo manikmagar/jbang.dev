@@ -1,15 +1,34 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
-//DEPS info.picocli:picocli:4.5.0
-//DEPS org.kohsuke:github-api:1.128
-//DEPS com.google.code.gson:gson:2.8.6
-//DEPS org.commonmark:commonmark:0.17.1
-//DEPS org.commonmark:commonmark-ext-gfm-tables:0.17.1
-//DEPS org.commonmark:commonmark-ext-autolink:0.17.1
-//DEPS org.commonmark:commonmark-ext-gfm-strikethrough:0.17.1
-//DEPS org.commonmark:commonmark-ext-task-list-items:0.17.1
+//DEPS info.picocli:picocli:4.7.7
+//DEPS org.kohsuke:github-api:1.330
+//DEPS com.google.code.gson:gson:2.14.0
+//DEPS org.commonmark:commonmark:0.30.0
+//DEPS org.commonmark:commonmark-ext-gfm-tables:0.30.0
+//DEPS org.commonmark:commonmark-ext-autolink:0.30.0
+//DEPS org.commonmark:commonmark-ext-gfm-strikethrough:0.30.0
+//DEPS org.commonmark:commonmark-ext-task-list-items:0.30.0
 
-import com.google.gson.*;
-import com.google.gson.annotations.SerializedName;
+import static java.lang.System.out;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.commonmark.Extension;
 import org.commonmark.ext.autolink.AutolinkExtension;
@@ -18,26 +37,23 @@ import org.commonmark.ext.gfm.tables.TablesExtension;
 import org.commonmark.ext.task.list.items.TaskListItemsExtension;
 import org.commonmark.parser.Parser;
 import org.commonmark.renderer.html.HtmlRenderer;
-import org.kohsuke.github.*;
+import org.kohsuke.github.GitHubAbuseLimitHandler;
+import org.kohsuke.github.GHContent;
+import org.kohsuke.github.GHException;
+import org.kohsuke.github.GitHub;
+import org.kohsuke.github.GitHubBuilder;
+import org.kohsuke.github.PagedSearchIterable;
+import org.kohsuke.github.HttpException;
+import org.kohsuke.github.GitHubRateLimitHandler;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
+import com.google.gson.annotations.SerializedName;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-
-import static java.lang.System.out;
-
-import java.io.*;
-import java.net.HttpURLConnection;
-import java.nio.file.Files;
-import java.nio.file.OpenOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * To run this script, set two environment variables GH_USER and GH_TOKEN. These
@@ -55,7 +71,7 @@ class appstore implements Callable<Integer> {
   }
 
   @Option(names = { "-d",
-      "--destDir" }, defaultValue = "./assets/data/", description = "Destination dir to generate cataloger")
+      "--destDir" }, defaultValue = "./public/assets/data/", description = "Destination dir to generate cataloger")
   private Path destinationDir;
 
   @Option(names = {
@@ -81,49 +97,78 @@ class appstore implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     gitHub = GitHubBuilder.fromEnvironment().withOAuthToken(ghToken)
-            .withAbuseLimitHandler(AbuseLimitHandler.WAIT)
-            .withRateLimitHandler(RateLimitHandler.WAIT).build();
+            .withAbuseLimitHandler(GitHubAbuseLimitHandler.WAIT)
+            .withRateLimitHandler(GitHubRateLimitHandler.WAIT).build();
 
     out.println(gitHub.getRateLimit().toString());
     var gson = new GsonBuilder().setPrettyPrinting().create();
     List<CatalogItem> aliasItems = new ArrayList<>();
     List<CatalogItem> templateItems = new ArrayList<>();
-    PagedSearchIterable<GHContent> ghContents = gitHub.searchContent().filename("jbang-catalog.json").extension(".json")
-        .list().withPageSize(5);
+    List<GHContent> contents = fetchCatalogsWithRetry();
 
-       var it = ghContents.iterator();
-        int retries = 5;
+    out.println("Found " + contents.size() + " catalogs");
 
-        while (retries > 0) {
-          try {
-            while (it.hasNext()) {
-              var content = it.next();
-              String location = content.getOwner().getFullName() + "/" + content.getPath();
-              if (excludedCatalogs.contains(location)) {
-                out.println("Excluded - " + location);
-              } else {
-                out.println("Processing - " + location);
-                TimeUnit.SECONDS.sleep(1);
-                var catalogContent = toJsonElement(gson, content);
-                if (catalogContent != null) {
-                  catalogContent.aliases.entrySet().stream().map(entry -> toCatalogerItem(entry, content))
-                      .forEach(aliasItems::add);
+    int processed = 0;
+    int retries = 5;
+    int index = 0;
 
-                  catalogContent.templates.entrySet().stream().map(entry -> templateToItem(entry, content))
-                      .forEach(templateItems::add);
-                }
-              }
-              retries = 0;
-            }
-          } catch (GHException ghe) {
-            printExceptionCauseChain(ghe);
-            retries--;
-            if (retries > 0) {
-              out.println("Wait 3 minutes...retries:" + retries);
-              TimeUnit.MINUTES.sleep(3);
-            }
+    while (index < contents.size()) {
+      GHContent content = contents.get(index);
+      String location = content.getOwner().getFullName() + "/" + content.getPath();
+      try {
+        if (excludedCatalogs.contains(location)) {
+          out.println("Excluded - " + location);
+        } else {
+          out.println("Processing - " + location);
+          TimeUnit.MILLISECONDS.sleep(400);
+          var catalogContent = toJsonElement(gson, content);
+          if (catalogContent != null) {
+            catalogContent.aliases.entrySet().stream().map(entry -> toCatalogerItem(entry, content))
+                .forEach(aliasItems::add);
+
+            catalogContent.templates.entrySet().stream().map(entry -> templateToItem(entry, content))
+                .forEach(templateItems::add);
           }
         }
+        processed++;
+        index++;
+        retries = 5;
+      } catch (HttpException he) {
+        int code = he.getResponseCode();
+        // code < 0: client could not even build the URL (e.g. space in path) — permanent, skip
+        if (code < 0 || code == 400 || code == 404 || code == 422 || code == 451 || (code == 403 && !isRateLimit(he))) {
+            out.println("Skipping " + location + " due to HTTP " + code + " error.");
+            processed++;
+            index++;
+            retries = 5;
+        } else {
+            printExceptionCauseChain(he);
+            retries--;
+            if (retries <= 0) {
+                throw he;
+            }
+            Duration wait = backoffDelay(he);
+            out.println("GitHub returned HTTP " + code + " while processing " + location + ". Sleeping " + wait.toMinutes()
+                + "m before retrying (" + retries + " retries left)");
+            TimeUnit.MILLISECONDS.sleep(wait.toMillis());
+        }
+      } catch (IOException ioe) {
+        out.println("Skipping " + location + " due to IOException: " + ioe.getMessage());
+        processed++;
+        index++;
+        retries = 5;
+      } catch (GHException ghe) {
+        printExceptionCauseChain(ghe);
+        retries--;
+        if (retries <= 0) {
+          throw ghe;
+        }
+        Duration wait = backoffDelay(ghe);
+        out.println("GitHub throttled while processing " + location + ". Sleeping " + wait.toMinutes()
+            + "m before retrying (" + retries + " retries left)");
+        TimeUnit.MILLISECONDS.sleep(wait.toMillis());
+      }
+    }
 
     List<CatalogItem> sortedAliases = aliasItems.stream()
         .sorted(Comparator.comparing(catalogerItem -> -catalogerItem.stars)).collect(Collectors.toList());
@@ -230,6 +275,62 @@ class appstore implements Callable<Integer> {
     return html;
   }
 
+
+  private List<GHContent> fetchCatalogsWithRetry() throws InterruptedException {
+    int retries = 5;
+    while (true) {
+      try {
+        PagedSearchIterable<GHContent> ghContents = gitHub.searchContent().filename("jbang-catalog.json")
+            .extension(".json").list().withPageSize(100);
+
+        List<GHContent> contents = new ArrayList<>();
+        var iterator = ghContents.iterator();
+        while (iterator.hasNext()) {
+          contents.add(iterator.next());
+        }
+        return contents;
+      } catch (GHException ghe) {
+        printExceptionCauseChain(ghe);
+        retries--;
+        if (retries <= 0) {
+          throw ghe;
+        }
+        Duration wait = backoffDelay(ghe);
+        out.println("GitHub throttled while listing catalogs. Sleeping " + wait.toMinutes() + "m (" + retries
+            + " retries left)");
+        TimeUnit.MILLISECONDS.sleep(wait.toMillis());
+      }
+    }
+  }
+
+  private Duration backoffDelay(Throwable throwable) {
+    if (isSecondaryRateLimit(throwable)) {
+      return Duration.ofMinutes(5);
+    }
+    return Duration.ofMinutes(1);
+  }
+
+  private boolean isSecondaryRateLimit(Throwable throwable) {
+    while (throwable != null) {
+      String message = throwable.getMessage();
+      if (message != null && (message.contains("429") || message.contains("secondary rate limit"))) {
+        return true;
+      }
+      throwable = throwable.getCause();
+    }
+    return false;
+  }
+  private boolean isRateLimit(Throwable throwable) {
+    while (throwable != null) {
+      String message = throwable.getMessage();
+      if (message != null && (message.contains("429") || message.toLowerCase().contains("rate limit"))) {
+        return true;
+      }
+      throwable = throwable.getCause();
+    }
+    return false;
+  }
+
   private Catalog toJsonElement(Gson gson, GHContent catalogContent) throws IOException {
     if (catalogContent == null)
       return null;
@@ -271,16 +372,59 @@ class Template {
 
 class Cataloger {
   public final int aliasCount;
-  public final List<CatalogItem> aliases;
-  private List<CatalogItem> templates;
-  private int templateCount;
+  public final int templateCount;
+  public final List<CatalogEntry> catalogs;
 
-  public Cataloger(List<CatalogItem> items, List<CatalogItem> sortedTemplates) {
-    this.aliases = items;
-    aliasCount = items.size();
+  public Cataloger(List<CatalogItem> aliasItems, List<CatalogItem> templateItems) {
+    // Group by repo
+    Map<String, CatalogEntry> entries = new LinkedHashMap<>();
 
-    this.templates = sortedTemplates;
-    this.templateCount = sortedTemplates.size();
+    for (CatalogItem item : aliasItems) {
+      entries.computeIfAbsent(item.repoOwner + "/" + item.repoName,
+          k -> new CatalogEntry(item.repoOwner, item.repoName, item.stars, item.icon_url, item.link))
+          .aliases.add(new CompactItem(item));
+    }
+    for (CatalogItem item : templateItems) {
+      entries.computeIfAbsent(item.repoOwner + "/" + item.repoName,
+          k -> new CatalogEntry(item.repoOwner, item.repoName, item.stars, item.icon_url, item.link))
+          .templates.add(new CompactItem(item));
+    }
+
+    this.catalogs = new ArrayList<>(entries.values());
+    this.aliasCount = aliasItems.size();
+    this.templateCount = templateItems.size();
+  }
+}
+
+class CatalogEntry {
+  public final String owner;
+  public final String name;
+  public final int stars;
+  public final String icon;
+  public final String link;
+  public final List<CompactItem> aliases = new ArrayList<>();
+  public final List<CompactItem> templates = new ArrayList<>();
+
+  public CatalogEntry(String owner, String name, int stars, String icon, String link) {
+    this.owner = owner;
+    this.name = name;
+    this.stars = stars;
+    this.icon = icon;
+    this.link = link;
+  }
+}
+
+class CompactItem {
+  public final String a; // alias
+  public final String d; // description (nullable)
+  public final String s; // scriptRef (nullable)
+  public final String c; // command
+
+  public CompactItem(CatalogItem item) {
+    this.a = item.alias;
+    this.d = item.description;
+    this.s = item.scriptRef;
+    this.c = item.command;
   }
 }
 

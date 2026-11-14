@@ -1,0 +1,143 @@
+@charset "utf-8";
+
+$serif      : Georgia, Times, serif;
+$sans-serif : "Montserrat",sans-serif;
+
+$link-color:#EB586F;
+
+a {
+    text-decoration: none;
+    color: #EB586F;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.v-tabs-items {
+    padding: 15px;
+    border: 1px solid #ddd;
+}
+
+/* button styling */
+.copyButton {
+    border: none;
+    cursor: pointer;
+    outline: none;
+    margin-left: 5px;
+    margin-right: 10px;
+    background-color: transparent;
+}
+.copyButton:hover {
+    opacity: 0.8;
+}
+
+@import "highlightjs-copy";
+
+@import "minimal-mistakes/skins/contrast"; // skin
+@import "minimal-mistakes"; // main partials
+
+@import "https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css";
+
+/* ==========================================================================
+   THEBE (Jupyter notebook integration)
+   ========================================================================== */
+
+/* Style Thebe buttons to match site theme */
+.thebe-activate button,
+.thebe-run-button,
+.thebe-restart-button,
+.thebe-run-all-cells-button,
+.thebe-clear-button,
+button.thebelab-button,
+div[class*="thebe"] button,
+div[class*="thebelab"] button {
+    display: inline-block;
+    margin-bottom: 0.25em;
+    padding: 0.5em 1em;
+    font-family: $sans-serif;
+    font-size: $type-size-6;
+    font-weight: bold;
+    text-align: center;
+    text-decoration: none;
+    border: none;
+    border-radius: $border-radius;
+    cursor: pointer;
+    background-color: $primary-color;
+    color: white;
+    
+    &:hover {
+        background-color: mix(#000, $primary-color, 20%);
+    }
+}
+
+.thebe-status {
+    margin: 0.5em 0;
+    padding: 0.5em;
+    font-size: $type-size-7;
+    font-style: italic;
+}
+
+/* Style the code cells */
+.thebelab-cell {
+    margin: 1em 0;
+    
+    pre {
+        position: relative;
+        background-color: mix(#fff, $background-color, 50%);
+        border: 1px solid $border-color;
+        border-radius: $border-radius;
+        padding: 1em;
+    }
+}
+
+.layout--splash {
+    input#search-input {
+        margin-left: 1rem;
+        margin-bottom: .1em;
+        width: 10em;
+        flex-shrink: 1;
+        min-width: 6em;
+    }
+
+    .feature__wrapper {
+        margin: 0;
+        padding: 2em 0;
+
+        a.btn--cta {
+            margin-top: 1.25em
+        }
+
+        .twitter-tweet {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        &:not(.twitter-wrapper) {
+            @include breakpoint($small) {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 1em;
+
+                .feature__item {
+                    display: grid;
+                    grid-template-rows: subgrid;
+                    grid-row: span 2;
+
+                    width: 100%;
+
+                    .archive__item {
+                        display: grid;
+                        grid-template-rows: subgrid;
+                        grid-row: span 2;
+
+                        &-teaser {
+                            align-self: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

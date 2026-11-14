@@ -1,0 +1,164 @@
+---
+header:
+  teaser: /assets/images/java-you-can-share.png
+title: Java in Places You Do Not Expect It
+tagline: Java you can share
+category: learn
+tags: [jbang]
+author: Max Rydahl Andersen
+bgcolor: ff5a71
+---
+ifdef::env-github,env-browser,env-vscode[:imagesdir:../../public/assets/images]
+
+JBang is about making Java something you can edit, build, run, deploy and share with minimum ceremony and optimally zero friction. This is a work in progress, and this week I feel we got a big step closer to the ultimate goal. Best way to show this? Just try it yourself - it takes 5 seconds.
+
+== Try Java in your browser
+
+Click this link → link:/try/?repo=https%3A%2F%2Fgithub.com%2Fjbangdev%2Fjbang-jupyter-examples&filepath=hibernate.ipynb&redirect=3[Run Java in your browser] - wait a moment and you have a running Java environment,
+showing Hibernate example in your browser. No JDK or IDE to install, no account, just works.
+
+image::/assets/images/hibernateipynb.gif[Java in your browser]
+
+Or scroll down and click "Activate" below to run Java code right here in this blog post:
+
+++++
+<!-- Configure and load Thebe - must be before the thbe js is loaded !-->
+<script type="text/x-thebe-config">
+  {
+        requestKernel: true,
+        persistKernel: false,
+        useJupyterLite: false,
+        useBinder: true,
+        binderOptions: {
+          repo: "jupyter-java/jupyter-java-binder",
+          ref: "jbang",
+          binderUrl: 'https://mybinder.org'
+        },
+        kernelOptions: {
+          kernelName: "jbang",
+        },
+        codeMirrorConfig: {
+         
+        }
+      }
+</script>
+
+<script src="https://unpkg.com/thebe@0.9.3/lib/index.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/thebe@0.9.3/lib/thebe.css">
+
+++++
+
+++++
+<div class="thebe-activate"></div>
+<div class="thebe-status"></div>
+++++
+
+++++
+<div class="listingblock">
+  <div class="content">
+    <pre class="highlight hljs-copy-wrapper">
+      <code class="language-java hljs" data-lang="java" data-executable="true">
+//DEPS io.jeamlit:jeamlit:0.46.0
+//DEPS ch.qos.logback:logback-classic:1.5.19
+
+import org.icepear.echarts.Bar;
+import io.jeamlit.core.Nb;
+import io.jeamlit.core.Jt;
+
+// only need to run this once - jeamlit shared CSS and web components 
+display(Nb.getInitHtml(), "text/html");
+
+// some chart
+Bar bar = new Bar()
+        .setLegend()
+        .setTooltip("item")
+        .addXAxis(new String[] { "Matcha Latte", "Milk Tea", "Cheese Cocoa", "Walnut Brownie" })
+        .addYAxis()
+        .addSeries("2015", new Number[] { 43.3, 83.1, 86.4, 72.4 })
+        .addSeries("2016", new Number[] { 85.8, 73.4, 65.2, 53.9 })
+        .addSeries("2017", new Number[] { 93.7, 55.1, 82.5, 39.1 });
+
+display(Nb.render(Jt.echarts(bar).build()), "text/html");
+      </code>
+    </pre> 
+  </div>
+</div>
+++++
+
+That is real Java. With real Maven dependencies. Output rendered in your browser with no additional install.
+
+For those curious - above is using https://github.com/jeamlit/jeamlit[Jeamlit] to render the chart in your browser. It should look something like this:
+
+image::/assets/images/jeamlit-barchart.png[Jeamlit]
+
+Jeamlit is a new library similar to Streamlit for Python, not done by us but inspired by JBang that allows building interactive web apps in Java with zero friction - do https://jeamlit.io/[check it out]!
+
+== What was made
+
+I've been wanting to use `//DEPS` in Jupyter Notebooks for a long time, but it has been a pain to set up, so I 
+talked with maintainers of https://github.com/dflib/jjava[JJava] and https://github.com/padreati/rapaio-jupyter-kernel[Rapaio] kernels and explored options. Each has their own way of dealing with dependencies - and I prefer to minimize the friction thus I created a JJava derived kernel that supports `//DEPS` directives in notebooks.
+
+And in doing so I discovered that we could use Python's existing infrastructure (Jupyter Notebooks, MyBinder and Thebe) to go some steps further.
+
+There is a shockingly small amount of code to make this all work - and its in its infancy still; there is a lot more one can do with this -
+and I'm hoping you all will help make it better to make Java something you can share and use with zero friction.
+
+Here's what we've built:
+
+* Created a custom https://github.com/jbangdev/jbang-jupyter[JBang Jupyter kernel] that supports `//DEPS` directives in notebooks, based on JJava kernel
+* Built a https://github.com/jupyter-java/jupyter-java-binder[Binder environment] for running Java kernels in your browser with no install
+* Developed https://github.com/jbangdev/jbang-jupyter-runner[jbang-jupyter-runner] extension to run .java/.jsh files directly in Jupyter Lab
+
+Put it all together and you have a way to run Java code in your browser with no additional install.
+
+**Note:** This is not just for browser-based notebooks - it also works in IntelliJ, VSCode, Cursor and other IDEs that support Jupyter Notebooks.
+
+== How to Try It
+
+The fastest way is our new link:/try/[jbang.dev/try] page.
+
+**In your browser (no install):**
+
+* Click link:/try/?repo=https%3A%2F%2Fgithub.com%2Fjbangdev%2Fjbang-jupyter-examples&filepath=hibernate.ipynb[this Hibernate example]
+* Try link:/try/?code=IO.println%28%22Hello%20from%20JBang%21%22%29%3B[custom code]
+* Build link:/try/custom/[your own shareable links] for your repositories
+
+**Locally (with Jupyter):**
+
+[source,bash]
+----
+jbang install-kernel@jupyter-java --java 25 --enable-preview jbang
+----
+
+Works in IntelliJ, VSCode, Cursor, and any IDE with Jupyter support! If not - let us know!
+
+== What This Unlocks
+
+*Instant workshops* — A browser tab replaces a 45-minute install session.
+
+*Runnable documentation* — Stop making readers imagine the output. Let them press Run.
+
+*Shareable bug reproductions* — "Can you reproduce this?" becomes a link, not a setup guide.
+
+*API exploration* — Test a library with `//DEPS`, not `pom.xml`.
+
+This is not about data science or competing with Python.
+
+This is about making Java something you can share with zero friction — all in line with JBang's mission.
+
+== Try It Now
+
+Ready to experience zero-friction Java?
+
+**Get started:**
+
+* Try the link:/try/[interactive demo] right now - multiple samples available
+* Click link:/try/?repo=https%3A%2F%2Fgithub.com%2Fjbangdev%2Fjbang-jupyter-examples&filepath=hibernate.ipynb&redirect=3[this Hibernate example] to see it in action
+* Create link:/try/custom/[custom shareable links] for your own projects
+* Install locally: `jbang install-kernel@jupyter-java --java 25 --enable-preview jbang`
+
+This is still new and evolving - we have more ideas and plans for this, so stay tuned!
+
+This is about making Java something you can share with zero friction — all in line with JBang's mission.
+
+Enjoy!

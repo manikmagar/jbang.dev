@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 5000
+          fetch-tags: false
+
+      - name: Build Website
+        uses: ./.github/actions/build-website
+        with:
+          site-future: 'true'
+          github-pages: 'false'
+
+      - name: Store PR id
+        run: echo ${{ github.event.number }} > ./target/roq/pr-id.txt
+
+      - name: Publishing directory for PR preview
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: site
+          path: ./target/roq
+          retention-days: 3
+          # Keep /.well-known/ (dotfiles excluded by default)
+          include-hidden-files: true

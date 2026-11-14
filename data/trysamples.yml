@@ -1,0 +1,75 @@
+items:
+  - value: helloworld.jsh
+    label: Hello World
+    badge:
+      text: Java 25
+      variant: neutral
+      pill: true
+  - value: hellojbang.jsh
+    label: Hello JBang (with ASCII art)
+    badge:
+      text: Java 25
+      variant: neutral
+      pill: true
+  - category: Language Features
+    items:
+      - value: recordbasics.jsh
+        label: Records
+        badge:
+          text: Java 21
+          variant: neutral
+          pill: true
+      - value: pattern_switch.jsh
+        label: Pattern Matching in Switch
+        badge:
+          text: Java 25
+          variant: neutral
+          pill: true
+      - value: sequenced_collections_demo.jsh
+        label: Sequenced Collections
+        badge:
+          text: Java 21
+          variant: neutral
+          pill: true
+      - value: textblock_wordcount.jsh
+        label: Text Blocks & Word Count
+        badge:
+          text: Java 15
+          variant: neutral
+          pill: true
+  - category: Concurrency
+    items:
+      - value: virtual_threads_quick.jsh
+        label: Virtual Threads (10,000 tasks)
+        badge:
+          text: Java 21
+          variant: neutral
+          pill: true
+  - category: Data Processing
+    items:
+      - value: csv_parse_no_deps.jsh
+        label: CSV Parsing (no deps)
+        badge:
+          text: Java 25
+          variant: neutral
+          pill: true
+      - value: httpclient_get_jackson.jsh
+        label: HTTP Client + Jackson
+        badge:
+          text: Java 21
+          variant: neutral
+          pill: true
+      - value: qute.jsh
+        label: Qute - Template Engine
+        badge:
+          text: Java 25
+          variant: neutral
+          pill: true
+  - category: Shell Integration
+    items:
+      - value: jash.jsh
+        label: Jash - Shell Commands in Java
+        badge:
+          text: Java 25
+          variant: neutral
+          pill: true

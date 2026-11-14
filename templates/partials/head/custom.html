@@ -1,0 +1,86 @@
+<!-- start custom head snippets -->
+
+<!-- Agent discovery link relations (RFC 8288, RFC 9727) -->
+<link rel="api-catalog" href="/.well-known/api-catalog" type="application/linkset+json">
+<link rel="service-doc" href="/documentation/guide/latest/index.html" title="JBang Documentation">
+
+
+<!-- insert favicons. use https://realfavicongenerator.net/ -->
+
+<!-- hilight -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/dark.min.css" media="print" onload="this.media='all'" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js" defer></script>
+<script defer>document.addEventListener('DOMContentLoaded', function() { hljs.highlightAll(); });</script>
+
+<!-- Global click-to-copy for pre/code blocks -->
+<style>
+pre, :not(pre) > code {
+  cursor: pointer;
+  position: relative;
+}
+pre:hover, :not(pre) > code:hover {
+  opacity: 0.9;
+}
+pre::after {
+  content: "Click to copy";
+  position: absolute;
+  right: 10px;
+  top: 5px;
+  font-size: 12px;
+  color: #999;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+pre:hover::after {
+  opacity: 1;
+}
+.copy-toast {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  padding: 0.75rem 1.25rem;
+  border-radius: 6px;
+  background: #2e7d32;
+  color: white;
+  font-size: 0.9rem;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: copy-toast-in 0.2s ease;
+  display: none;
+}
+@keyframes copy-toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var toast = document.createElement('div');
+  toast.className = 'copy-toast';
+  document.body.appendChild(toast);
+  var toastTimer;
+  function showCopyToast(msg) {
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function() { toast.style.display = 'none'; }, 2500);
+  }
+  window.showCopyToast = showCopyToast;
+  document.addEventListener('click', function(e) {
+    var pre = e.target.closest('pre');
+    var code = !pre ? e.target.closest('code') : null;
+    var target = pre || code;
+    if (!target) return;
+    var text = target.textContent;
+    navigator.clipboard.writeText(text).then(function() {
+      showCopyToast('Copied: ' + text.trim().substring(0, 80) + (text.trim().length > 80 ? '…' : ''));
+    });
+  });
+});
+</script>
+
+<!-- Greedy nav: moves items that don't fit into a hamburger dropdown -->
+<script src="/assets/js/greedy-nav.js" defer></script>
+
+<!-- end custom head snippets -->
